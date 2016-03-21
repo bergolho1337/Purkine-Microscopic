@@ -1,0 +1,9 @@
+#!/bin/bash
+var=1
+times=5
+make
+while [ $var -le $times ]
+do
+	./microscopic 2.0 50 1.0e-04 $var
+	(( var++ ))
+done
