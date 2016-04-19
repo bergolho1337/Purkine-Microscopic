@@ -48,7 +48,7 @@ void printCellsVTK (Graph *g, int exec_number)
 }
 
 // Imprime informações do modelo
-void printInfoModel (Graph *g, double *y0, double Dx, double Dt, double t_max, int exec_number, int num_fibers, double probGap, 
+void printInfoModel (Graph *g, double *y0, double Dx, double Dt, double t_max, int exec_number, int num_fibers, double probGap,
 			double diameter_bundle, double s_c, double s_p, double s_t, int pac, int ret, int cool)
 {
 	char filename[50];
@@ -68,9 +68,9 @@ void printInfoModel (Graph *g, double *y0, double Dx, double Dt, double t_max, i
 	fprintf(out,"Probability of gap junction = %.2f %%\n",probGap*100.0);
 	fprintf(out,"Diameter of the bundle = %.2f um\n",diameter_bundle);
 	fprintf(out,"\n===== Conductivities: =====\n");
-	fprintf(out,"Citoplasmatic gap junction = %.2f uS/um\n",s_c);
-	fprintf(out,"Plicate gap junction = %.2f uS/um\n",s_p);
-	fprintf(out,"Transversal gap junction = %.2f uS/um\n",s_t);
+	fprintf(out,"Citoplasmatic conductivity = %.2f uS/um\n",s_c);
+	fprintf(out,"Plicate gap junction conductance = %.2f uS\n",s_p);
+	fprintf(out,"Transversal gap junction conductance = %.2f uS\n",s_t);
 	fprintf(out,"\n===== FLAGS: ======\n");
 	fprintf(out,"Pacing = %s\n",pac?"True":"False");
 	fprintf(out,"Retroprogation = %s\n",ret?"True":"False");
@@ -79,7 +79,7 @@ void printInfoModel (Graph *g, double *y0, double Dx, double Dt, double t_max, i
 }
 
 // Escreve um arquivo de dados da solução da equação para um vetor de volumes de controle
-void writeGraphic (Graph *g, double t, const int *id, int size, int num_eq, int exec_number)
+void writeGraphic (Graph *g, double t, int *id, int size, int num_eq, int exec_number)
 {
 	int k;
 	char filename[50];
@@ -88,7 +88,7 @@ void writeGraphic (Graph *g, double t, const int *id, int size, int num_eq, int 
 	{
 		sprintf(filename,"../Runs/Run%d/data%d.dat",exec_number,id[k]);
 		file = fopen(filename,"a");
-	
+
 		Node *ptr = g->searchNode(id[k]);
 		fprintf(file,"%e ",t);
 		for (int i = 0; i < num_eq; i++)
@@ -136,12 +136,12 @@ void writeVTK (Graph *g, int j, int exec_number)
 	fprintf(fileVTK,"SCALARS vm float 1\n");
 	fprintf(fileVTK,"LOOKUP_TABLE default\n");
 	ptr = g->getListNodes();
-		
+
 	while (ptr != NULL)
 	{
 		fprintf(fileVTK,"%e\n",ptr->getCell()->y[0]);
 		ptr = ptr->getNext();
-	}			
+	}
 	fclose(fileVTK);
 }
 
@@ -197,7 +197,7 @@ void printCellsRetroprogVTK (Graph *g, int exec_number)
 }
 
 // Plota os gráficos dos volumes passados como parâmetros
-void makePlot (const int *plot, int size, int exec_number)
+void makePlot (int *plot, int size, int exec_number)
 {
 	FILE *arq;
 	char filename[30];
@@ -252,7 +252,7 @@ void makePlot (const int *plot, int size, int exec_number)
 		if (!system("gnuplot graph.plt"))
 			cout << "[+] Grafico plotado com sucesso!" << endl;
 		else
-			cout << "[-] ERRO! Plotando grafico!" << endl;	
+			cout << "[-] ERRO! Plotando grafico!" << endl;
 	}
 }
 
@@ -263,8 +263,8 @@ void writeVelocity (double velocity, double delta_x, double delta_t, double t1, 
 	FILE *file = fopen(filename,"a");
 	fprintf(file,"\n==========================================================\n");
 	fprintf(file,"Propagation velocity = %.2f cm/s\n",velocity);
-	fprintf(file,"delta_x = %.2f\tdelta_t = %.2f\n",delta_x,delta_t);
-	fprintf(file,"t1 = %.2f\tt2 = %.2f\n",t1,t2);
+	fprintf(file,"delta_x = %.2f\tdelta_t = %e\n",delta_x,delta_t);
+	fprintf(file,"t1 = %e\tt2 = %e\n",t1,t2);
 	fprintf(file,"maxV = %.2f\n",*maxV);
 	fprintf(file,"==========================================================\n");
 	fclose(file);
@@ -285,7 +285,7 @@ void writeCylinderVTK (Graph *g, int exec_number)
 	fprintf(file,"Cylinder\n");
 	fprintf(file,"ASCII\n");
 	fprintf(file,"DATASET POLYDATA\n");
-	fprintf(file,"POINTS %d float\n",2*k);	
+	fprintf(file,"POINTS %d float\n",2*k);
 	for (i = 0; i < k; i++)
 	{
 		teta = i*delta;
@@ -301,14 +301,14 @@ void writeCylinderVTK (Graph *g, int exec_number)
 	{
 		if (i == k-2)
 			fprintf(file,"2 %d %d\n",i+1,1);
-		else	
+		else
 			fprintf(file,"2 %d %d\n",i+1,i+2);
 	}
 	for (i = k-1; i < 2*(k-1); i++)
 	{
 		if (i == 2*(k-1)-1)
 			fprintf(file,"2 %d %d\n",i+1,k+1);
-		else	
+		else
 			fprintf(file,"2 %d %d\n",i+1,i+2);
 	}
 	fprintf(file,"2 %d %d\n",1,k);
@@ -321,14 +321,14 @@ void printCooldown (Graph *g, int exec_number)
 	char filename[50];
 	sprintf(filename,"../Runs/Run%d/info_simulation",exec_number);
 	FILE *file = fopen(filename,"a");
-	Node *ptr = g->getListNodes();		
+	Node *ptr = g->getListNodes();
 	while (ptr != NULL)
 	{
 		if (ptr->getStimulus())
 			fprintf(file,"\nCell %d - Cooldown = %d",ptr->getId(),ptr->getCell()->cooldown);
-		ptr = ptr->getNext(); 
+		ptr = ptr->getNext();
 	}
-	fclose(file);	
+	fclose(file);
 }
 
 void printExecution (int i, bool retro)

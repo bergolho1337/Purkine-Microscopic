@@ -15,10 +15,10 @@
 using namespace std;
 
 #define PACING 0			// Flag para realizar ou não pacing
-#define RETRO 0				// Flag para calcular ou não retropropagação
+#define RETRO 1				// Flag para calcular ou não retropropagação
 #define COOLDOWN 0			// Flag que controla o momento de ativação do estímulo das células
 
-const int plot[2] = {1,42};		// Índice do volume de controle que iremos plotar ao longo do tempo
+int plot[2] = {1,42};		// Índice do volume de controle que iremos plotar ao longo do tempo
 
 // Define o tipo Func, ponteiro para função que recebe t, um vetor y e o intervalo de tempo k como parâmetro e retorna a avaliação da função
 typedef
@@ -77,7 +77,7 @@ int main (int argc, char *argv[])
 
 		// Captura as condições inicias do modelo
 		y0 = getInitialConditions();
-		maxV = y0[0];
+		maxV = y0[4];
 
 		// Funções da EDO
 		Func *f = getFunctions();
@@ -85,11 +85,15 @@ int main (int argc, char *argv[])
 		// Cria o grafo que representa as fibras de Purkinje microscópica
 		Graph *g = new Graph(y0,num_equacoes,Dx,exec_number);
 		// Seta os ponteiros para o cálculo da velocidade de propagação
+		//ptr1 = g->searchNode(plot[0]);
+		//ptr2 = g->searchNode(plot[1]);
+		cout << "===== Setting plot pointers ======" << endl;
+		g->setPlotPointers(plot);
 		ptr1 = g->searchNode(plot[0]);
 		ptr2 = g->searchNode(plot[1]);
 
 		printCellsVTK(g,exec_number);
-		printInfoModel(g,y0,Dx,Dt,t_max,exec_number,fib_in_bundle,prob_gapJ,D,sigma_c,sigma_p,sigma_t,PACING,RETRO,COOLDOWN);
+		printInfoModel(g,y0,Dx,Dt,t_max,exec_number,fib_in_bundle,prob_gapJ,D,sigma_c,G_p,G_t,PACING,RETRO,COOLDOWN);
 
 		// Setar os parâmetros para resolver as EDOs e as EDPs
 		setParameters(Dx,Dt,Cm,D/2,PACING,RETRO,COOLDOWN);
@@ -108,11 +112,20 @@ int main (int argc, char *argv[])
 			writeGraphic(g,t,plot,2,num_equacoes,exec_number);
 
 			// Escreve a iteração atual em VTK
-			if (M > 1000)
+			if (M > 10000)
 			{
-				// Printa só algumas iterações
-				if (j % 5 == 0)
-					writeVTK(g,j,exec_number);
+				if (M < 1000)
+				{
+					// Printa só algumas iterações
+					if (j % 5 == 0)
+						writeVTK(g,j,exec_number);
+				}
+				else
+				{
+					// Printa só algumas iterações
+					if (j % 200 == 0)
+						writeVTK(g,j,exec_number);
+				}
 			}
 			else
 				writeVTK(g,j,exec_number);
@@ -137,9 +150,13 @@ int main (int argc, char *argv[])
 
 		// Printa informação sobre cooldown
 		//printCooldown(g,exec_number);
-		// Printa retropropagação
-		//retro = printRetropropagation(g,exec_number);
-		//printCellsRetroprogVTK(g,exec_number);
+		if (RETRO)
+		{
+			// Printa retropropagação
+			cout << "==== Printing retropropagation ... =====" << endl;
+			retro = printRetropropagation(g,exec_number);
+			printCellsRetroprogVTK(g,exec_number);
+		}
 		// Imprime cilindro
 		writeCylinderVTK(g,exec_number);
 

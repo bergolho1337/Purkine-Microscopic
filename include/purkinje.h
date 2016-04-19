@@ -1,3 +1,5 @@
+// Mudar a distribuição dos volumes de controle: |c|c|g|c|c|g|
+
 #ifndef PURKINJE_H
 #define PURKINJE_H
 
@@ -11,13 +13,13 @@ using namespace std;
 
 #define Iter 1				// Número de iterações de crescimento da árvore.
 #define depth 10.0			// Profundidade de uma célula.
-#define scale_size 4000			// Escala de tamanho para o tamanho das fibras (um)
-#define fib_in_bundle 5			// Número de fibras contidas no 'bundle' da raiz.
-#define prob_gapJ 0.1			// Probabilidade de ter uma gap junction entre fibras vizinhas (paralela).
+#define scale_size 2000			// Escala de tamanho para o tamanho das fibras (um)
+#define fib_in_bundle 2			// Número de fibras contidas no 'bundle' da raiz.
+#define prob_gapJ 0.0			// Probabilidade de ter uma gap junction entre fibras vizinhas (paralela).
 #define D 100.0				// Diâmetro do bundle da raiz (um)
-#define sigma_c 120.0			// Condutividade da gap junction citoplasmática
-#define sigma_p 100.0			// Condutividade da gap junction plicate
-#define sigma_t 25.0			// Condutividade da gap junction tranversal
+#define sigma_c 0.4			// Condutividade da gap junction citoplasmática (default = 0.4 uS/um)
+#define G_p 0.5			// Condutância da gap junction plicate (default = 0.5 uS)
+#define G_t 0.5			// Condutância da gap junction tranversal (default = 0.5 uS)
 #define cc 500				// Cooldown máximo
 
 class Edge;
@@ -149,6 +151,7 @@ public:
 // Funções
 	void makeRoot (double Dx);
 	double* initializeRandomGenerator ();
+	void setPlotPointers (int *plot);
 	Node* searchNode (int id);
 	void insertNodeGraph (Node *p);
 	void insertEdgeGraph (int id_1, int id_2);

@@ -21,8 +21,9 @@ double n0 = 1.0e-02;
 // Parameters:
 //double beta = 1400;			// um-1
 double beta;					// um-1
-double Cm = 2.4e-03;			// uF/um^2
-double g_Na_max = 4.0e+05;		
+//double Cm = 2.4e-03;			// uF/um^2
+double Cm = 1.0e-07;				// uF/um^2
+double g_Na_max = 4.0e+05;
 double E_Na = 4.0e+01;
 double g_L = 7.5e+01;
 double E_L = -6.0e+01;
@@ -43,7 +44,7 @@ double calc_i_Leak (double V_old)
 
 double calc_g_K2 (double n_old)
 {
-	return ((1.2e+03*pow(n_old,4.0e+00)));  
+	return ((1.2e+03*pow(n_old,4.0e+00)));
 }
 
 double calc_g_K1 (double V_old)
@@ -155,9 +156,9 @@ double* getInitialConditions ()
 Func* getFunctions ()
 {
 	Func *f = new Func[num_equacoes];
-	f[0] = dvdt;						
-	f[1] = dmdt;				
-	f[2] = dhdt;				
+	f[0] = dvdt;
+	f[1] = dmdt;
+	f[2] = dhdt;
 	f[3] = dndt;
-	return (f);				
+	return (f);
 }

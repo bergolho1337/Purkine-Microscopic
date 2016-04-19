@@ -1,9 +1,9 @@
 #!/bin/bash
 var=1
-times=5
+times=3
 make
 while [ $var -le $times ]
 do
-	./microscopic 2.0 50 1.0e-04 $var
+	./microscopic 0.5 100 1.0e-05 $var
 	(( var++ ))
 done
