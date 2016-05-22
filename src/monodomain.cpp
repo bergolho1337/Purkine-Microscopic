@@ -1,28 +1,122 @@
 #include "monodomain.h"
 
-// Parâmetros fixados dos métodos
-double dt;
-double dx;
-double C_m;
-double BETA;									// Considerado como um cubo de dimensão (dx,dx,dx)
-bool pacing;
-bool retrop;
-bool cooldown;
-set<int> retropropaga;				// Conjunto que armazena os nós de retropropagação
+// Parâmetros fixados
+double dt;										// Tamanho do intervalo no tempo
+double dx;										// Tamanho do intervalo no espaço
+double C_m;										// Valor da capacitância do modelo
+double BETA;									// Relação área/volume. Considerando o volume um cilindro
+double radius;								// Raio de uma celula
+double **A;										// Matriz do metodo implicito
+double *b;										// Vetor do metodo implicito
+double *pivot;								// Vetor dos pivos (LU)
 
-void setParameters (double Dx, double Dt, double cm, double R, int PACING, int RETROP, int COOLDOWN)
+// Setando os parâmetros do modelo nas variáveis globais
+void setParameters (double Dx, double Dt, double cm)
 {
 	dx = Dx;
 	dt = Dt;
-	pacing = PACING;
-	retrop = RETROP;
-	cooldown = COOLDOWN;
 	C_m = cm;
-	BETA = 4/dx;
-	cout << "Beta = " << BETA << endl;
-	cout << "Cm = " << C_m << endl;
+	radius = diameter_cell / 2;
+	BETA = (2/cell_length)+(2/radius);
 }
 
+
+// Constrói a matriz do método implícito e já gera a decomposição LU.
+void makeMatrix_A (Graph *g)
+{
+	Node *ptr;
+	Edge *ptrl;
+	int i, total_nodes;
+	double alfa, phi, teta, sum, sigma;
+
+	// Inicializa variaveis
+	total_nodes = g->getTotalNodes();
+	phi = (sigma_c*dt)/(BETA*C_m*dx*dx);
+	teta = (G_p*dt)/(BETA*C_m*PI*radius*radius*dx);
+	ptr = g->getListNodes();
+
+	// Aloca memoria
+	A = new double*[total_nodes]();
+	for (i = 0; i < total_nodes; i++)
+		A[i] = new double[total_nodes]();
+	pivot = new double[total_nodes]();
+
+	// Percorrer os volumes
+	while (ptr != NULL)
+	{
+		ptrl = ptr->getEdges();
+		sum = 0;
+		while (ptrl != NULL)
+		{
+			if (ptrl->getSigma() == sigma_c)
+				sigma = phi;
+			else
+				sigma = teta;
+			sum += sigma;
+			A[ptr->getId()-1][ptrl->getDest()->getId()-1] = -sigma;
+			ptrl = ptrl->getNext();
+		}
+		sum += 1;
+		// Condição de Neumann nas folhas
+		if (ptr->getNumEdges() == 1 && !ptr->getStimulus())
+		{
+			A[ptr->getId()-1][ptr->getId()-1] = 1;
+			A[ptr->getId()-1][ptr->getEdges()->getDest()->getId()-1] = -1;
+		}
+		else
+			A[ptr->getId()-1][ptr->getId()-1] = sum;
+		ptr = ptr->getNext();
+	}
+
+	// Decomposição LU
+	int j, k, p;
+	double Amax, t, m, r, Mult;
+	// 1 PASSO: Transformar a matriz A do problema em duas matrizes triangulares L e U.
+	for (i = 0; i < total_nodes; i++)
+		pivot[i] = i;
+	for (j = 0; j < total_nodes-1; j++)
+	{
+		// Escolher pivot
+		p = j;
+		Amax = abs(A[j][j]);
+		// Verifica na coluna a ser eliminada qual elemento possui o maior valor absoluto, este elemento será o pivô.
+		for (k = j+1; k < total_nodes; k++)
+		{
+			if (abs(A[k][j]) > Amax)
+			{
+				Amax = abs(A[k][j]);
+				p = k;
+			}
+		}
+		// Se (p != j) então deve-se trocar de linhas
+		if (p != j)
+		{
+			for (k = 0; k < total_nodes; k++)
+			{
+				t = A[j][k];
+				A[j][k] = A[p][k];
+				A[p][k] = t;
+			}
+			m = pivot[j];
+			pivot[j] = pivot[p];
+			pivot[p] = m;
+		}
+		if (abs(A[j][j]) != 0)
+		{
+			// Eliminação de Gauss
+			r = 1 / A[j][j];
+			for (i = j+1; i < total_nodes; i++)
+			{
+				Mult = A[i][j]*r;
+				A[i][j] = Mult;
+				for (k = j+1; k < total_nodes; k++)
+					A[i][k] = A[i][k] - Mult*A[j][k];
+			}
+		}
+	}
+}
+
+/*
 bool printRetropropagation (Graph *g, int exec_number)
 {
 	char filename[50];
@@ -84,134 +178,35 @@ void checkRetropropagation (Node *ptr)
 		ptrl = ptrl->getNext();
 	}
 }
+*/
 
+// (Reação): Resolve as EDOs associadas para cada volume de controle da rede
 void solveEDO (Graph *g, double t, int k, Func *func, int num_eq)
 {
 	int i;
 	double f[num_eq];
-	Cell *c;
+	Volume *v;
 	Node *ptr = g->getListNodes();
 	while (ptr != NULL)
 	{
-		c = ptr->getCell();
+		v = ptr->getVolume();
 		// Verifica se a celula se polarizou novamente
-		if (c->y[0] < -80)
+		if (v->y_old[0] < -80)
 			ptr->setRetro(false);
 		for (i = 0; i < num_eq; i++)
 		{
 			// Calcular o potencial transmembranico intermediário -> V_{i/2} = V*
 			if (i == 0)
 			{
-				f[0] = func[0](k,t,c->y)*dt;
-				c->V_star = c->y[0] + f[0];
+				f[0] = func[0](k,t,v->y_old)*dt;
+				v->V_star = v->y_old[0] + f[0];
 			}
 			// gate -> n -> n+1
 			else
 			{
-				f[i] = func[i](k,t,c->y)*dt;
-				c->y_new[i] = c->y[i] + f[i];
+				f[i] = func[i](k,t,v->y_old)*dt;
+				v->y_new[i] = v->y_old[i] + f[i];
 			}
-		}
-		ptr = ptr->getNext();
-	}
-}
-
-void solveEDP (Graph *g, Func *func, double t, int k, int num_eq)
-{
-	Node *ptr;
-	Cell *c1, *c2;
-	double r;
-	double f[num_eq];
-	int j;
-
-	ptr = g->getListNodes();
-	while (ptr != NULL)
-	{
-		c1 = ptr->getCell();
-		// Verifica quantas arestas estao ligados ao volume de controle atual
-		switch (ptr->getNumEdges())
-		{
-			case 1: {
-					// Se for celula de estimulo
-					if (ptr->getStimulus())
-					{
-						// Realizar pacing ?
-						if (pacing && k % CYCLE_L == 0 && k != 0)
-							c1->y_new[0] = -70;
-						// Senão resolver a EDO normalmente para a V
-						else
-						{
-							// O volume está em cooldown ?
-							if (cooldown && k < c1->cooldown)
-							{
-								for (j = 0; j < num_eq; j++)
-									c1->y_new[j] = c1->y[j];
-							}
-							// Resolver normalmente
-							else
-							{
-								for (j = 0; j < num_eq; j++)
-								{
-									f[j] = func[j](k,t,c1->y)*dt;
-									c1->y_new[j] = c1->y[j] + f[j];
-								}
-							}
-						}
-					}
-					// Senao a celula eh folha, logo aplica-se condicao de Neumann dv/dt=0
-					else
-					{
-						c2 = ptr->getEdges()->getDest()->getCell();
-						// Citoplasma ? Resolver usando sigma_c
-						if (c2->type == 0)
-							r = (c2->sigma*dt)/(dx*dx*C_m*BETA);
-						// Senão é gap junctions: resolver usando G_p
-						else
-							r = (c2->sigma*dt)/(dx*dx*dx*C_m*BETA);
-						//cout << r << endl;
-						checkCFL(r);
-
-						c1->y_new[0] = r*(c2->V_star - c1->V_star) + c1->V_star;
-					}
-					break;
-				}
-			default: {
-					// Celula de bifurcacao caso geral
-					double V_star = 0.0;
-					double sigma_med;
-					Edge *ptrl = ptr->getEdges();
-					c1 = ptr->getCell();
-					while (ptrl != NULL)
-					{
-						c2 = ptrl->getDest()->getCell();
-						//sigma_med = (c1->sigma + c2->sigma)/2.0;
-						//r = (dt*sigma_med)/(dx*dx*C_m*BETA);
-						// Citoplasma ? Resolver usando sigma_c
-						if (c2->type == 0)
-							r = (c2->sigma*dt)/(dx*dx*C_m*BETA);
-						// Senão é gap junctions: resolver usando G_p
-						else
-							r = (c2->sigma*dt)/(dx*dx*dx*C_m*BETA);
-						checkCFL(r);
-						// Corrente entrando no volume
-						if (ptrl->getId() < ptr->getId())
-							V_star += r*(c2->V_star - c1->V_star);
-						// Corrente saindo do volume
-						else
-						{
-							// Checa se uma corrente de reentrada esta prestes a acontecer, nesse caso liberar a corrente alterando a condutividade
-							//if (c1->y[0] < -80 && c2->y[0] > -79)
-							//{
-							//	r = (dt*sigma_c)/(dx*dx*C_m*BETA);
-							//	checkCFL(r);
-							//}
-							V_star -= r*(c1->V_star - c2->V_star);
-						}
-						ptrl = ptrl->getNext();
-					}
-					checkRetropropagation(ptr);
-					c1->y_new[0] = V_star + c1->V_star;
-				 }
 		}
 		ptr = ptr->getNext();
 	}
@@ -222,21 +217,75 @@ void nextTimestep (Graph *g, int num_eq)
 {
 	int i;
 	Node *ptr = g->getListNodes();
-	Cell *c;
+	Volume *v;
 	while (ptr != NULL)
 	{
-		c = ptr->getCell();
+		v = ptr->getVolume();
 		for (i = 0; i < num_eq; i++)
-			c->y[i] = c->y_new[i];
+			v->y_old[i] = v->y_new[i];
 		ptr = ptr->getNext();
 	}
 }
 
-void checkCFL (double r)
+void solveEDP_Imp (Graph *g)
 {
-	if (r >= 0.5)
+	Node *ptr;
+	// Resolve o sistema do metodo implicito
+	double *Vnext = LU(g->getTotalNodes());
+	// Seta os valores de V_n+1 nos volumes de controle
+	ptr = g->getListNodes();
+	while (ptr != NULL)
 	{
-		cout << "[-] ERROR! CFL condition was violated! r = " << r << endl;
-		exit(1);
+		ptr->getVolume()->y_new[0] = Vnext[ptr->getId()-1];
+		ptr = ptr->getNext();
 	}
+	delete [] Vnext;
+	delete [] b;
+}
+
+void makeVector_b (Graph *g)
+{
+	Node *ptr;
+	b = new double[g->getTotalNodes()];
+	ptr = g->getListNodes();
+	while (ptr != NULL)
+	{
+		// Condição de Neumann
+		if (ptr->getNumEdges() == 1 && !ptr->getStimulus())
+			b[ptr->getId()-1] = 0.0;
+		else
+			b[ptr->getId()-1] = ptr->getVolume()->V_star;
+		ptr = ptr->getNext();
+	}
+}
+
+// Resolve um sistema linear em que a matriz A já foi decomposta.
+double* LU (int n)
+{
+	int i, j, k;
+	double *y = new double[n];
+	double soma;
+	k = pivot[0];
+	y[0] = b[k];
+	// Realizar substituições sucessivas para resolver o sistema triangular inferior: Ly = b
+	for (i = 1; i < n; i++)
+	{
+		soma = 0;
+		for (j = 0; j <= i-1; j++)
+			soma += A[i][j]*y[j];
+		k = pivot[i];
+		y[i] = b[k] - soma;
+	}
+	// Realizar substituições retroativas para resolver o sistema triangular superior: Ux = y
+	double *x = new double[n];
+	x[n-1] = y[n-1] / A[n-1][n-1];
+	for (i = n-2; i >= 0; i--)
+	{
+		soma = 0;
+		for (j = i+1; j < n; j++)
+			soma += A[i][j]*x[j];
+		x[i] = (y[i] - soma) / A[i][i];
+	}
+	delete [] y;
+	return (x);
 }

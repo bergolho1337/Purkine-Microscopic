@@ -4,6 +4,6 @@ times=3
 make
 while [ $var -le $times ]
 do
-	./microscopic 0.5 100 1.0e-05 $var
+	./microscopic 1.2 25 1.0e-05 1 $var
 	(( var++ ))
 done

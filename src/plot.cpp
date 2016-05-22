@@ -26,7 +26,7 @@ void printCellsVTK (Graph *g, int exec_number)
 		ptrl = ptr->getEdges();
 		while (ptrl != NULL)
 		{
-			fprintf(fileVTK,"2 %d %d\n",ptr->getId()-1,ptrl->getId()-1);
+			fprintf(fileVTK,"2 %d %d\n",ptr->getId()-1,ptrl->getDest()->getId()-1);
 			ptrl = ptrl->getNext();
 		}
 		ptr = ptr->getNext();
@@ -38,7 +38,10 @@ void printCellsVTK (Graph *g, int exec_number)
 	ptr = g->getListNodes();
 	while (ptr != NULL)
 	{
-		if (ptr->getCell()->type == 1 || ptr->getCell()->type == 2)
+		ptrl = ptr->getEdges();
+		while (ptrl->getNext() != NULL)
+			ptrl = ptrl->getNext();
+		if (ptrl->getSigma() == G_p || ptrl->getSigma() == G_t)
 			fprintf(fileVTK,"%e\n",1.0);
 		else
 			fprintf(fileVTK,"%e\n",0.0);
@@ -48,8 +51,7 @@ void printCellsVTK (Graph *g, int exec_number)
 }
 
 // Imprime informações do modelo
-void printInfoModel (Graph *g, double *y0, double Dx, double Dt, double t_max, int exec_number, int num_fibers, double probGap,
-			double diameter_bundle, double s_c, double s_p, double s_t, int pac, int ret, int cool)
+void printInfoModel (Graph *g, double *y0, double Dx, double Dt, double t_max, int exec_number, int num_fibers, double probGap, double d_bundle, double l_cell, double d_cell, double fl, double s_c, double s_p, double s_t, double C)
 {
 	char filename[50];
 	sprintf(filename,"../Runs/Run%d/info_simulation",exec_number);
@@ -63,39 +65,56 @@ void printInfoModel (Graph *g, double *y0, double Dx, double Dt, double t_max, i
 	fprintf(out,"M = %d\n",(int)(t_max/Dt));
 	fprintf(out,"Dx = %e um\n",Dx);
 	fprintf(out,"Dt = %e s\n",Dt);
-	fprintf(out,"Fiber length = %.2f um\n",g->getTotalNodes()*Dx/fib_in_bundle);
+	fprintf(out,"Fiber length = %.2f um\n",fl);
 	fprintf(out,"Number of fibers = %d\n",num_fibers);
 	fprintf(out,"Probability of gap junction = %.2f %%\n",probGap*100.0);
-	fprintf(out,"Diameter of the bundle = %.2f um\n",diameter_bundle);
-	fprintf(out,"\n===== Conductivities: =====\n");
+	fprintf(out,"Diameter of the bundle = %.2f um\n",d_bundle);
+	fprintf(out,"Diameter of the cell = %.2f um\n",d_cell);
+	fprintf(out,"Radius of the cell = %.2f um\n",d_cell/2);
+	fprintf(out,"Capacitance = %.2f um/cm^2\n",C*1.0e+08);
+	fprintf(out,"Beta (surface/volume) = %.2f um^-1\n",(2/l_cell)+(2/(d_cell/2)));
+	fprintf(out,"\n================= CONDUCTION ================================\n");
 	fprintf(out,"Citoplasmatic conductivity = %.2f uS/um\n",s_c);
 	fprintf(out,"Plicate gap junction conductance = %.2f uS\n",s_p);
 	fprintf(out,"Transversal gap junction conductance = %.2f uS\n",s_t);
-	fprintf(out,"\n===== FLAGS: ======\n");
-	fprintf(out,"Pacing = %s\n",pac?"True":"False");
-	fprintf(out,"Retroprogation = %s\n",ret?"True":"False");
-	fprintf(out,"Cooldown = %s\n",cool?"True":"False");
 	fclose(out);
 }
 
 // Escreve um arquivo de dados da solução da equação para um vetor de volumes de controle
-void writeGraphic (Graph *g, double t, int *id, int size, int num_eq, int exec_number)
+void writeGraphic (Graph *g, double t, Node **plot, int num_eq, int exec_number)
 {
 	int k;
 	char filename[50];
 	FILE *file;
-	for (k = 0; k < size; k++)
+	for (k = 0; k < 2; k++)
 	{
-		sprintf(filename,"../Runs/Run%d/data%d.dat",exec_number,id[k]);
+		sprintf(filename,"../Runs/Run%d/data%d.dat",exec_number,plot[k]->getId());
 		file = fopen(filename,"a");
-
-		Node *ptr = g->searchNode(id[k]);
 		fprintf(file,"%e ",t);
 		for (int i = 0; i < num_eq; i++)
-			fprintf(file,"%e ", ptr->getCell()->y[i]);
+			fprintf(file,"%e ", plot[k]->getVolume()->y_old[i]);
 		fprintf(file,"\n");
 		fclose(file);
 	}
+}
+
+void writeIteration (Graph *g, int j, int M, int exec_number)
+{
+	if (M > 10000)
+	{
+		if (M < 15000)
+		{
+			if (j % 20 == 0)
+				writeVTK(g,j,exec_number);
+		}
+		else
+		{
+			if (j % 200 == 0)
+					writeVTK(g,j,exec_number);
+		}
+	}
+	else
+		writeVTK(g,j,exec_number);
 }
 
 // Escreve arquivo VTK com as informações do modelo no instante de tempo j
@@ -126,7 +145,7 @@ void writeVTK (Graph *g, int j, int exec_number)
 		ptrl = ptr->getEdges();
 		while (ptrl != NULL)
 		{
-			fprintf(fileVTK,"2 %d %d\n",ptr->getId()-1,ptrl->getId()-1);
+			fprintf(fileVTK,"2 %d %d\n",ptr->getId()-1,ptrl->getDest()->getId()-1);
 			ptrl = ptrl->getNext();
 		}
 		ptr = ptr->getNext();
@@ -139,12 +158,13 @@ void writeVTK (Graph *g, int j, int exec_number)
 
 	while (ptr != NULL)
 	{
-		fprintf(fileVTK,"%e\n",ptr->getCell()->y[0]);
+		fprintf(fileVTK,"%e\n",ptr->getVolume()->y_old[0]);
 		ptr = ptr->getNext();
 	}
 	fclose(fileVTK);
 }
 
+/*
 // Procedimento para imprimir em VTK a estrutura das fibras destacando os nós em que ocorreu retropropagação
 void printCellsRetroprogVTK (Graph *g, int exec_number)
 {
@@ -195,22 +215,23 @@ void printCellsRetroprogVTK (Graph *g, int exec_number)
 	//fprintf(file,"RETROPROPAGA!\n");
 	//fclose(file);
 }
+*/
 
 // Plota os gráficos dos volumes passados como parâmetros
-void makePlot (int *plot, int size, int exec_number)
+void makePlot (Node **plot, int exec_number)
 {
 	FILE *arq;
 	char filename[30];
 	int k;
-	for (k = 0; k < size; k++)
+	for (k = 0; k < 2; k++)
 	{
-		sprintf(filename,"../Runs/Run%d/data%d.dat",exec_number,plot[k]);
+		sprintf(filename,"../Runs/Run%d/data%d.dat",exec_number,plot[k]->getId());
 		// Imprime o gráfico do potencial transmembrânico (V)
 		arq = fopen("graph.plt","w+");
 		fprintf(arq,"set grid\n");
 		fprintf(arq,"set terminal png\n");
 		fprintf(arq,"set output \"../Runs/Run%d/Graphics/dvdt%d.png\"\n",exec_number,k);
-		fprintf(arq,"set title \"Vol = %d\"\n",plot[k]);
+		fprintf(arq,"set title \"Vol = %d\"\n",plot[k]->getId());
 		fprintf(arq,"plot \"%s\" using 1:2 title \"Vm\" w l\n",filename);
 		fclose(arq);
 		if (!system("gnuplot graph.plt"))
@@ -222,7 +243,7 @@ void makePlot (int *plot, int size, int exec_number)
 		fprintf(arq,"set grid\n");
 		fprintf(arq,"set terminal png\n");
 		fprintf(arq,"set output \"../Runs/Run%d/Graphics/dmdt%d.png\"\n",exec_number,k);
-		fprintf(arq,"set title \"Vol = %d\"\n",plot[k]);
+		fprintf(arq,"set title \"Vol = %d\"\n",plot[k]->getId());
 		fprintf(arq,"plot \"%s\" using 1:3 title \"m\" w l\n",filename);
 		fclose(arq);
 		if (!system("gnuplot graph.plt"))
@@ -234,7 +255,7 @@ void makePlot (int *plot, int size, int exec_number)
 		fprintf(arq,"set grid\n");
 		fprintf(arq,"set terminal png\n");
 		fprintf(arq,"set output \"../Runs/Run%d/Graphics/dhdt%d.png\"\n",exec_number,k);
-		fprintf(arq,"set title \"Vol = %d\"\n",plot[k]);
+		fprintf(arq,"set title \"Vol = %d\"\n",plot[k]->getId());
 		fprintf(arq,"plot \"%s\" using 1:4 title \"m\" w l\n",filename);
 		fclose(arq);
 		if (!system("gnuplot graph.plt"))
@@ -246,7 +267,7 @@ void makePlot (int *plot, int size, int exec_number)
 		fprintf(arq,"set grid\n");
 		fprintf(arq,"set terminal png\n");
 		fprintf(arq,"set output \"../Runs/Run%d/Graphics/dndt%d.png\"\n",exec_number,k);
-		fprintf(arq,"set title \"Vol = %d\"\n",plot[k]);
+		fprintf(arq,"set title \"Vol = %d\"\n",plot[k]->getId());
 		fprintf(arq,"plot \"%s\" using 1:4 title \"m\" w l\n",filename);
 		fclose(arq);
 		if (!system("gnuplot graph.plt"))
@@ -316,6 +337,21 @@ void writeCylinderVTK (Graph *g, int exec_number)
 	fclose(file);
 }
 
+void writeTime (clock_t begin, clock_t end, int exec_number)
+{
+	FILE *file;
+	char filename[50];
+	double elapsed;
+	elapsed = (double)(end-begin)/(double)CLOCKS_PER_SEC;
+	sprintf(filename,"../Runs/Run%d/info_simulation",exec_number);
+	file = fopen(filename,"a");
+	fprintf(file,"\n[+] Simulation completed with sucess!\n");
+	fprintf(file,"Time elapsed: %e s\n",elapsed);
+	fclose(file);
+	cout << "[+] Simulation completed with sucess!" << endl;
+	cout << "Time elapsed = " << elapsed << "s" << endl << endl;
+}
+
 void printCooldown (Graph *g, int exec_number)
 {
 	char filename[50];
@@ -325,7 +361,7 @@ void printCooldown (Graph *g, int exec_number)
 	while (ptr != NULL)
 	{
 		if (ptr->getStimulus())
-			fprintf(file,"\nCell %d - Cooldown = %d",ptr->getId(),ptr->getCell()->cooldown);
+			fprintf(file,"\nCell %d - Cooldown = %d",ptr->getId(),ptr->getVolume()->cooldown);
 		ptr = ptr->getNext();
 	}
 	fclose(file);
@@ -335,7 +371,7 @@ void printExecution (int i, bool retro)
 {
 	FILE *file;
 	char filename[10];
-	sprintf(filename,"../Runs/Run%d/run%d.txt",i);
+	sprintf(filename,"../Runs/Run%d/run%d.txt",i,i);
 	file = fopen(filename,"w+");
 	if (retro)
 		fprintf(file,"[!] RETROPROPAGATION happen!\n");
