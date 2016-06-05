@@ -17,7 +17,8 @@ void setParameters (double Dx, double Dt, double cm)
 	dt = Dt;
 	C_m = cm;
 	radius = diameter_cell / 2;
-	BETA = (2/cell_length)+(2/radius);
+	//BETA = (2/cell_length)+(2/radius);			// Cilindro
+	BETA = 6/Dx;															// Paralelepido
 }
 
 
@@ -28,11 +29,21 @@ void makeMatrix_A (Graph *g)
 	Edge *ptrl;
 	int i, total_nodes;
 	double alfa, phi, teta, sum, sigma;
+	double sigma_p, sigma_t;
+	// Condutividade media de uma gap junction longitudinal
+	//sigma_p = (l*G_p)/(PI*R_m*R_m);													// Cilindro
+	//sigma_t = (l*G_t)/(PI*R_m*R_m);													// Cilindro
+	sigma_p = G_p / diameter_cell;														// Paralelepido
+	sigma_t = G_t / diameter_cell;														// Paralelepido
 
 	// Inicializa variaveis
 	total_nodes = g->getTotalNodes();
-	phi = (sigma_c*dt)/(BETA*C_m*dx*dx);
-	teta = (G_p*dt)/(BETA*C_m*PI*radius*radius*dx);
+	teta = (sigma_c*dt)/(BETA*C_m*dx*dx);											// Paralelepido
+	phi = (sigma_p*dt)/(BETA*C_m*dx*dx);											// Paralelepido
+	alfa = (sigma_t*dt)/(BETA*C_m*dx*dx);											// Paralelepido
+	//teta = (sigma_c*dt)/(BETA*C_m*dx*dx);										// Cilindro
+	//phi = (sigma_p*dt)/(BETA*C_m*l*dx);											// Cilindro
+	//alfa = (sigma_t*dt)/(BETA*C_m*l*dx);											// Cilindro
 	ptr = g->getListNodes();
 
 	// Aloca memoria
@@ -49,9 +60,11 @@ void makeMatrix_A (Graph *g)
 		while (ptrl != NULL)
 		{
 			if (ptrl->getSigma() == sigma_c)
-				sigma = phi;
-			else
 				sigma = teta;
+			else if (ptrl->getSigma() == G_p)
+				sigma = phi;
+			else if (ptrl->getSigma() == G_t)
+				sigma = alfa;
 			sum += sigma;
 			A[ptr->getId()-1][ptrl->getDest()->getId()-1] = -sigma;
 			ptrl = ptrl->getNext();

@@ -9,18 +9,20 @@
 
 using namespace std;
 
-#define Iter 1							// Número de iterações de crescimento da árvore.
-#define fiber_length 30000	// Tamanho das fibras (um)
-#define cell_length 100			// Tamanho das celulas (um)
-#define diameter_cell 80		// Diametro da celula (um)
-#define fib_in_bundle 3			// Número de fibras contidas no 'bundle' da raiz.
-#define prob_gapJ 0.0				// Probabilidade de ter uma gap junction entre fibras vizinhas (paralela).
-#define D 100.0							// Diâmetro do bundle da raiz (um)
-#define sigma_c 0.4					// Condutividade da gap junction citoplasmática (default = 0.4 uS/um)
-#define G_p 0.5							// Condutância da gap junction plicate (default = 0.5 uS)
-#define G_t 0.5							// Condutância da gap junction tranversal (default = 0.5 uS)
-#define cc 500							// Cooldown máximo
-//#define DEBUG							// Variável de debug
+#define Iter 1								// Número de iterações de crescimento da árvore.
+#define fiber_length 30000.0	// Tamanho das fibras (um)
+#define cell_length 100.0			// Tamanho das celulas (um)
+#define diameter_cell 25.0		// Diametro da celula (um) (intervalo: 20um <= diameter_cell <= 80um)
+#define R_m 25.0							// Raio medio de uma celula.
+#define fib_in_bundle 3				// Número de fibras contidas no 'bundle' da raiz.
+#define prob_gapJ 0.1					// Probabilidade de ter uma gap junction entre fibras vizinhas (paralela).
+#define D 100.0								// Diâmetro do bundle da raiz (um)
+#define sigma_c 0.4						// Condutividade da gap junction citoplasmática (default = 0.4 uS/um)
+#define G_p 0.5								// Condutância da gap junction plicate (default = 0.5 uS)
+#define G_t 1.0								// Condutância da gap junction tranversal (default = 0.5 uS)
+#define l 2500								// Tamanho de uma gap junction -> em (um) (intervalo: 2nm < l < 3nm)
+#define cc 500								// Cooldown máximo
+//#define DEBUG								// Variável de debug
 
 class Edge;
 class Node;

@@ -310,8 +310,8 @@ Node** Graph::setPlotPointers ()
 	// Set the plot to be at the end of the central fiber
 	Node **plot = new Node*[2];
 	cout << "[+] Setting plot pointers to volumes:" << endl;
-	plot[0] = searchNode(start_fiber[1]->getId() - 600);
-	plot[1] = searchNode(start_fiber[1]->getId() - 80);
+	plot[0] = searchNode(start_fiber[1]->getId() - 450);
+	plot[1] = searchNode(start_fiber[1]->getId() - 100);
 	cout << "\tVolume 1: " << plot[0]->getId() << endl;
 	cout << "\tVolume 2: " << plot[1]->getId() << endl;
 	return (plot);
@@ -450,11 +450,11 @@ void Graph::calculateVelocity (double t, Node *ptr1, Node *ptr2, double Dt, doub
 				}
 				else
 					noChange++;
-				if (noChange > 15)
+				if (noChange > 10)
 				{
 					flag = true;
 					calcVelocity = false;
-					t1 = t-(15*Dt);
+					t1 = t-(10*Dt);
 				}
 			}
 		}
